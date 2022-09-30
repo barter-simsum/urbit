@@ -80,6 +80,6 @@ in stdenv.mkDerivation {
 
   meta = {
     debug = enableDebug;
-    arguments = lib.optionals enableDebug [ "-g" ];
+    arguments = lib.optionals enableDebug [ "-g3" ];
   };
 }
