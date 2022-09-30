@@ -5,6 +5,12 @@
 
 //  declarations of inline functions
 //
+void *u3a_into(c3_w x);
+c3_w u3a_outa(void *p);
+c3_w u3a_to_off(c3_w som);
+void *u3a_to_ptr(c3_w som);
+c3_w *u3a_to_wtr(c3_w som);
+
 void
 u3a_drop(const u3a_pile* pil_u);
 void*
@@ -39,30 +45,35 @@ _box_count(c3_ws siz_ws) { }
 #endif
 
 /* _box_slot(): select the right free list to search for a block.
+   ;;: do we really need a loop to do this?
+
+   so our free list logic looks like this:
+   siz_w < 6 then [0]
+   siz_w < 16 then [1]
+   siz_w < 32 then [2]
+   siz_w < 64 then [3]
+   ...
+   siz_w > 16#40000000 (1073741824) [26]
 */
 static c3_w
-_box_slot(c3_w siz_w)
+_box_slot(c3_w siz_w) /* siz_w is MAX(min cell size (0x6), len_w + wiseof(box) + 1 = len_w + 2 + 1 */
 {
-  if ( siz_w < u3a_minimum ) {
-    return 0;
-  }
-  else {
-    c3_w i_w = 1;
+  if ( siz_w < u3a_minimum ) {  /* if siz_w < 6 words (24 bytes) */
+    return 0;                   /* the smallest obj freelist i suppose */
+  }                                /* ;;:refactor. -- without the else */
 
-    while ( 1 ) {
-      if ( i_w == u3a_fbox_no ) {
-        return (i_w - 1);
-      }
-      if ( siz_w < 16 ) {
-        return i_w;
-      }
-      siz_w = (siz_w + 1) >> 1;
-      i_w += 1;
-    }
-  }
+  /* ;;: what are the migration implications if this doesn't map to the same
+       outputs for all inputs? */
+  for (c3_w i_w = 1; i_w < u3a_fbox_no; i_w++, siz_w >>= 1)
+    if ( siz_w < 16 )
+      return i_w;
+  return u3a_fbox_no - 1;
 }
 
-/* _box_make(): construct a box.
+/* _box_make(): construct a box. 
+box_v - start addr of box 
+siz_w - size of allocated space adjacent to block 
+use_w - box's refcount
 */
 static u3a_box*
 _box_make(void* box_v, c3_w siz_w, c3_w use_w)
@@ -243,9 +254,39 @@ _box_free(u3a_box* box_u)
 /* _me_align_pad(): pad to first point after pos_p aligned at (ald_w, alp_w).
 */
 static __inline__ c3_w
-_me_align_pad(u3_post pos_p, c3_w ald_w, c3_w alp_w)
+_me_align_pad(u3_post pos_p, c3_w ald_w, c3_w alp_w) /* remember! pos_p is a LOOM REFERENCE! */
+/*
+Only possible combinations of ald_w and alp_w:
+malloc->walloc->willoc (alloc): (ald_w=4, alp_w=1)
+malloc (pad): (ald_w=4, alp_w=3)
+walloc: (ald_w=1, alp_w=0)  aka, I guess word-aligned. 
+
+This isn't quite right, run with the commented assert.  malloc->walloc->willoc
+changes it to: ald_w=4, alp_w=1 when we set alp_w to (alp_w +
+c3_wiseof(u3a_box)) % ald_w in top of willoc
+
+So, let's see. Alignment code will typically look something like this:
+startAddr;
+startAddr += alignment - 1
+startAddr &= ~(alignment - 1)
+
+ald_w I imagine is our desired alignment. What is the function of alp_w?
+
+Well, ald_w, at least for north roads has the effect of increasing the addr
+we're trying to align to. alp_w (because it's subtracted) has the opposite
+effect.
+
+*_me_align_dap, since in a south road would have align to the next lower aligned
+*address rather than higher, e.g.
+
+startAddr;
+// We don't need to advance the address
+startAddr &= ~(alignment - 1)
+
+*/
 {
-  c3_w adj_w = (ald_w - (alp_w + 1));
+  c3_assert((ald_w == 1 && alp_w == 0) || (ald_w == 4 && alp_w == 3) || (ald_w == 4 && alp_w == 1)); /* ;;: REM */
+  c3_w adj_w = (ald_w - (alp_w + 1)); /* here, we see that we always sub at least 1 */
   c3_p off_p = (pos_p + adj_w);
   c3_p orp_p = off_p &~ (ald_w - 1);
   c3_p fin_p = orp_p + alp_w;
@@ -259,7 +300,7 @@ _me_align_pad(u3_post pos_p, c3_w ald_w, c3_w alp_w)
 static __inline__ c3_w
 _me_align_dap(u3_post pos_p, c3_w ald_w, c3_w alp_w)
 {
-  c3_w adj_w = alp_w;
+  c3_w adj_w = alp_w;           /* but now we're adjusting by alp_w. wuh?? */
   c3_p off_p = (pos_p - adj_w);
   c3_p orp_p = (off_p &~ (ald_w - 1));
   c3_p fin_p = orp_p + alp_w;
@@ -276,19 +317,19 @@ _ca_box_make_hat(c3_w len_w, c3_w ald_w, c3_w alp_w, c3_w use_w)
   c3_w    pad_w, siz_w;
   u3_post all_p;
 
-  if ( c3y == u3a_is_north(u3R) ) {
+  if ( c3y == u3a_is_north(u3R) ) { /* north: 00 ~~~~rut----hat####SSS~~~~ FF */
     all_p = u3R->hat_p;
     pad_w = _me_align_pad(all_p, ald_w, alp_w);
     siz_w = (len_w + pad_w);
 
     //  hand-inlined: siz_w >= u3a_open(u3R)
     //
-    if ( (siz_w >= (u3R->cap_p - u3R->hat_p)) ) {
-      return 0;
+    if ( (siz_w >= (u3R->cap_p - u3R->hat_p)) ) { /* size greater than free space */
+      return 0;                 /* because not possible */
     }
-    u3R->hat_p = (all_p + siz_w);
+    u3R->hat_p = (all_p + siz_w); /* otherwise, extend hat by siz_w (alloc len + pad) */
   }
-  else {
+  else {                        /* south: 00 ~~~~SSS####hat----rut~~~~ FF */
     all_p = (u3R->hat_p - len_w);
     pad_w = _me_align_dap(all_p, ald_w, alp_w);
     siz_w = (len_w + pad_w);
@@ -416,29 +457,30 @@ _ca_reclaim_half(void)
 }
 
 /* _ca_willoc(): u3a_walloc() internals.
+   ;;:what are alp and ald? - seem related to padding. OHHH ALignment Desired and Alignment padding? Malloc calls with ald_w = 4 and alp_w = 3
 */
 static void*
 _ca_willoc(c3_w len_w, c3_w ald_w, c3_w alp_w)
 {
-  c3_w siz_w = c3_max(u3a_minimum, u3a_boxed(len_w));
-  c3_w sel_w = _box_slot(siz_w);
+  c3_w siz_w = c3_max(u3a_minimum, u3a_boxed(len_w)); /* MAX(min cell size (0x6), len_w + wiseof(box) + 1 = len_w + 2 + 1 */
+  c3_w sel_w = _box_slot(siz_w);                      /* sel_w indicates which freelist we will use */
 
-  alp_w = (alp_w + c3_wiseof(u3a_box)) % ald_w;
+  alp_w = (alp_w + c3_wiseof(u3a_box)) % ald_w; /* is alp_w an offset and ald_w our desired alignment? Why do we need to pass alp_w at all? */
 
-  //  XX: this logic is totally bizarre, but preserve it.
+  //  XX: this logic is totally bizarre, but preserve it.   WHY???
   //
-  if ( (sel_w != 0) && (sel_w != u3a_fbox_no - 1) ) {
-    sel_w += 1;
+  if ( (sel_w != 0) && (sel_w != u3a_fbox_no - 1) ) { /* if freelist is neither largest nor smallest */
+    sel_w += 1;                                       /* then increase by one. WTF??? Wouldn't this just lead to excessive internal fragmentation? What is the advantage? */
   }
 
   // u3l_log("walloc %d: *pfr_p %x\n", len_w, u3R->all.fre_p[sel_w]);
   while ( 1 ) {
-    u3p(u3a_fbox) *pfr_p = &u3R->all.fre_p[sel_w];
+    u3p(u3a_fbox) *pfr_p = &u3R->all.fre_p[sel_w]; /* pfr_p points to the looref freelist siz_w fits in */
 
     while ( 1 ) {
-      if ( 0 == *pfr_p ) {
-        if ( sel_w < (u3a_fbox_no - 1) ) {
-          sel_w += 1;
+      if ( 0 == *pfr_p ) {                 /* if null freelist */
+        if ( sel_w < (u3a_fbox_no - 1) ) { /* if not the largest freelist */
+          sel_w += 1;                      /* then, use the next freelist?;;; Has the effect of selecting the first non-null freelist */
           break;
         }
         else {
@@ -467,7 +509,7 @@ _ca_willoc(c3_w len_w, c3_w ald_w, c3_w alp_w)
           else return u3a_boxto(box_u);
         }
       }
-      else {
+      else {                    /* we got a non-null freelist */
         c3_w pad_w = _me_align_pad(*pfr_p, ald_w, alp_w);
 
         if ( 1 == ald_w ) c3_assert(0 == pad_w);
@@ -485,7 +527,7 @@ _ca_willoc(c3_w len_w, c3_w ald_w, c3_w alp_w)
           ** from the free list.
           */
           siz_w += pad_w;
-          _box_count(-(box_u->siz_w));
+          _box_count(-(box_u->siz_w)); /* a debug macro */
           {
             if ( (0 != u3to(u3a_fbox, *pfr_p)->pre_p) &&
                  (u3to(u3a_fbox, u3to(u3a_fbox, *pfr_p)->pre_p)->nex_p
@@ -499,7 +541,7 @@ _ca_willoc(c3_w len_w, c3_w ald_w, c3_w alp_w)
                    != (*pfr_p)) )
             {
               c3_assert(!"loom: corrupt");
-            }
+            } /* basic free list consistency checking in asserts above */
 
             if ( 0 != u3to(u3a_fbox, *pfr_p)->nex_p ) {
               u3to(u3a_fbox, u3to(u3a_fbox, *pfr_p)->nex_p)->pre_p =
@@ -672,10 +714,10 @@ u3a_calloc(size_t num_i, size_t len_i)
 void*
 u3a_malloc(size_t len_i)
 {
-  c3_w    len_w = (c3_w)((len_i + 3) >> 2);
-  c3_w*   ptr_w = _ca_walloc(len_w + 1, 4, 3);
+  c3_w    len_w = (c3_w)((len_i + 3) >> 2); /* ;;: eq len_i / sizeof(c3_w). kinda bad, makes assumptions about sizeof c3_w. Like many places in code. */
+  c3_w*   ptr_w = _ca_walloc(len_w + 1, 4, 3); /* ;;: ald_w=4, alp_w=3 => in willoc: ald_w=4, alp_w=1 */
   u3_post ptr_p = u3a_outa(ptr_w);
-  c3_w    pad_w = _me_align_pad(ptr_p, 4, 3);
+  c3_w    pad_w = _me_align_pad(ptr_p, 4, 3); /* ;;: ald_w=4, alp_w=3 */
   c3_w*   out_w = u3a_into(ptr_p + pad_w + 1);
 
 #if 0

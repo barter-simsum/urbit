@@ -7,27 +7,27 @@
   **/
     /* u3a_bits: number of bits in word-addressed pointer.  29 == 2GB.
     */
-#     define u3a_bits  U3_OS_LoomBits
+#     define u3a_bits  U3_OS_LoomBits /* 30 */
 
-    /* u3a_page: number of bits in word-addressed page.  12 == 16Kbyte page.
+    /* u3a_page: number of bits in word-addressed page.  12 == 16K page (4 * 4K).
     */
 #     define u3a_page   12
 
     /* u3a_pages: maximum number of pages in memory.
     */
-#     define u3a_pages  (1 << (u3a_bits - u3a_page))
+#     define u3a_pages  (1 << (u3a_bits - u3a_page)) /* 0x40_000 */
 
     /* u3a_words: maximum number of words in memory.
     */
-#     define u3a_words  (1 << u3a_bits)
+#     define u3a_words  (1 << u3a_bits) /* 0x40_000_000 */
 
     /* u3a_bytes: maximum number of bytes in memory.
     */
-#     define u3a_bytes  (sizeof(c3_w) * u3a_words)
+#     define u3a_bytes  (sizeof(c3_w) * u3a_words) /* 0x100_000_000 = 4G */
 
     /* u3a_cells: number of representable cells.
     */
-#     define u3a_cells  (c3_w)(u3a_words / u3a_minimum)
+#     define u3a_cells  (c3_w)(u3a_words / u3a_minimum) /* 0xaaaaaaa ~= 180_000_000 */
 
     /* u3a_maximum: maximum loom object size (largest possible atom).
     */
@@ -36,11 +36,11 @@
 
     /* u3a_minimum: minimum loom object size (actual size of a cell).
     */
-#     define u3a_minimum   (c3_w)(1 + c3_wiseof(u3a_box) + c3_wiseof(u3a_cell))
+#     define u3a_minimum   (c3_w)(1 + c3_wiseof(u3a_box) + c3_wiseof(u3a_cell)) /* 6W = 24B */
 
     /* u3a_fbox_no: number of free lists per size.
     */
-#     define u3a_fbox_no   27
+#     define u3a_fbox_no   27   /* why 27? Perhaps because 16 = 1 << 4 and 31 - 4 = 27 */
 
 
   /**  Structures.
@@ -88,7 +88,7 @@
 
     /* u3a_fbox: free node in heap.  Sets minimum node size.
     */
-      typedef struct _u3a_fbox {
+      typedef struct _u3a_fbox { /* free list node. doubly linked */
         u3a_box               box_u;
         u3p(struct _u3a_fbox) pre_p;
         u3p(struct _u3a_fbox) nex_p;
@@ -194,6 +194,43 @@
 #     define u3a_boxto(box_v)  ( (void *) \
                                    ( (u3a_box *)(void *)(box_v) + 1 ) )
 #     define u3a_botox(tox_v)  ( (u3a_box *)(void *)(tox_v) - 1 )
+
+  /**  Globals.
+  **/
+    /* u3_Road / u3R: current road (thread-local).
+    */
+      c3_global u3_road* u3a_Road;
+#       define u3R  u3a_Road
+
+    /* u3_Code: memory code.
+    */
+#ifdef U3_MEMORY_DEBUG
+      c3_global c3_w u3_Code;
+#endif
+
+#   define u3_Loom      ((c3_w *)(void *)U3_OS_LoomBase)
+
+
+/* ;;: func-like-macros doing pointer conversion -> inline */
+
+    /* u3a_into(): convert loom offset [x] into generic pointer.
+    */
+/* #     define  u3a_into(x) ((void *)(u3_Loom + (x))) */
+inline void *u3a_into(c3_w x) {
+  /* return ((uintptr_t)u3_Loom) + x; */
+  return u3_Loom + x;
+  /* return (void *)(c3_d)x; */
+}
+/* # define u3a_into(x) (u3a_into(x)) */
+
+    /* u3a_outa(): convert pointer [p] into word offset into loom.
+    */
+/* #     define  u3a_outa(p) (((c3_w*)(void*)(p)) - u3_Loom) */
+inline c3_w u3a_outa(void *p) {
+  return ((c3_w *)p) - u3_Loom;
+}
+/* # define u3a_outa(p) (u3a_outa(p)) */
+
     /* Inside a noun.
     */
 
@@ -215,15 +252,27 @@
 
     /* u3a_to_off(): mask off bits 30 and 31 from noun [som].
     */
-#     define u3a_to_off(som)    ((som) & 0x3fffffff)
+/* #     define u3a_to_off(som)    ((som) & 0x3fffffff) */
+inline c3_w u3a_to_off(c3_w som) {
+  return som & 0x3fffffff;      /* 1 << 30 - 1 */
+}
+/* # define u3a_to_off(som) (u3a_to_off(som)) */
 
     /* u3a_to_ptr(): convert noun [som] into generic pointer into loom.
     */
-#     define u3a_to_ptr(som)    (u3a_into(u3a_to_off(som)))
+/* #     define u3a_to_ptr(som)    (u3a_into(u3a_to_off(som))) */
+inline void *u3a_to_ptr(c3_w som) {
+  return u3a_into(u3a_to_off(som));
+}
+/* # define u3a_to_ptr(som) (u3a_to_ptr(som)) */
 
     /* u3a_to_wtr(): convert noun [som] into word pointer into loom.
     */
-#     define u3a_to_wtr(som)    ((c3_w *)u3a_to_ptr(som))
+/* #     define u3a_to_wtr(som)    ((c3_w *)u3a_to_ptr(som)) */
+inline c3_w *u3a_to_wtr(c3_w som) {
+  return (c3_w *)u3a_to_ptr(som);
+} /* unused anyway */
+/* # define u3a_to_wtr(som) (u3a_to_wtr(som)) */
 
     /* u3a_to_pug(): set bit 31 of [off].
     */
@@ -254,14 +303,6 @@
         ( _(u3a_is_cell(som)) \
            ? ( ((u3a_cell *)u3a_to_ptr(som))->tel )\
            : u3m_bail(c3__exit) )
-
-    /* u3a_into(): convert loom offset [x] into generic pointer.
-    */
-#     define  u3a_into(x) ((void *)(u3_Loom + (x)))
-
-    /* u3a_outa(): convert pointer [p] into word offset into loom.
-    */
-#     define  u3a_outa(p) (((c3_w*)(void*)(p)) - u3_Loom)
 
     /* u3a_is_north(): yes if road [r] is north road.
     */
@@ -344,20 +385,6 @@
                   : (u3a_botox(u3a_to_ptr(som))->use_w == 1) \
                   ? c3y : c3n )
 
-  /**  Globals.
-  **/
-    /* u3_Road / u3R: current road (thread-local).
-    */
-      c3_global u3_road* u3a_Road;
-#       define u3R  u3a_Road
-
-    /* u3_Code: memory code.
-    */
-#ifdef U3_MEMORY_DEBUG
-      c3_global c3_w u3_Code;
-#endif
-
-#   define u3_Loom      ((c3_w *)(void *)U3_OS_LoomBase)
 
   /**  inline functions.
   **/

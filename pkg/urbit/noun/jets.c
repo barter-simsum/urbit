@@ -313,7 +313,7 @@ _cj_install(u3j_core* ray_u, c3_w jax_l, u3_noun pel, u3_noun lab, u3j_core* dev
     for ( i_w = 0; 0 != dev_u[i_w].cos_c; i_w++ ) {
       u3j_core* kid_u = &dev_u[i_w];
       u3_noun   loc   = _cj_core_loc(u3k(pel), kid_u),
-                bal   = u3nc(u3k(u3h(u3t(loc))), u3k(lab));
+                bal   = u3nc(u3k(u3h(u3t(loc))), u3k(lab)); /* u3h(u3t(x)) = cadr . May want to consider funLMacro->inline for u3t and u3h*/
 
       kid_u->jax_l   = jax_l;
       ray_u[jax_l] = *kid_u;
