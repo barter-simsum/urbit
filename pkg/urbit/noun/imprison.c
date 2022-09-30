@@ -7,7 +7,7 @@
 */
 static c3_w
 _ci_slab_size(c3_g met_g, c3_d len_d)
-{
+{        /* ;;: TODO may want to look more into this. called by u3i_slab_bare */
   c3_d bit_d = len_d << met_g;
   c3_d wor_d = (bit_d + 0x1f) >> 5;
   c3_w wor_w = (c3_w)wor_d;
@@ -26,7 +26,7 @@ _ci_slab_size(c3_g met_g, c3_d len_d)
 */
 static void
 _ci_slab_init(u3i_slab* sab_u, c3_w len_w)
-{
+{ /* ;;: TODO will alignment changes (acc. of padding at end of alloc) affect perf here? */
   c3_w*     nov_w = u3a_walloc(len_w + c3_wiseof(u3a_atom));
   u3a_atom* vat_u = (void *)nov_w;
 
@@ -74,7 +74,7 @@ _ci_atom_mint(u3a_atom* vat_u, c3_w len_w)
   else if ( 1 == len_w ) {
     c3_w dat_w = *vat_u->buf_w;
 
-    if ( c3y == u3a_is_cat(dat_w) ) {
+    if ( c3y == u3a_is_cat(dat_w) ) { /* cuz direct atom */
       u3a_wfree(nov_w);
       return (u3_atom)dat_w;
     }
@@ -85,13 +85,13 @@ _ci_atom_mint(u3a_atom* vat_u, c3_w len_w)
   {
     c3_w old_w = vat_u->len_w;
 
-    if ( old_w > len_w ) {
+    if ( old_w > len_w ) { /* I suppose we're trimming the slab length if the atom we're minting doesn't require it */
       c3_y wiz_y = c3_wiseof(u3a_atom);
-      u3a_wtrim(nov_w, old_w + wiz_y, len_w + wiz_y);
+      u3a_wtrim(nov_w, old_w + wiz_y, len_w + wiz_y); /* only caller of u3a_wtrim */
     }
   }
 
-  vat_u->len_w = len_w;
+  vat_u->len_w = len_w; /* ;;: TODO is it assuming an exact alloc length or is end padding o.k.? */
 
   return u3a_to_pug(u3a_outa(nov_w));
 }

@@ -154,7 +154,7 @@ u3s_jam_fib(u3i_slab* sab_u, u3_noun a)
   //
   //
   fib_u.a_w   = ur_fib12;
-  fib_u.b_w   = ur_fib11;
+  fib_u.b_w   = ur_fib11;       /* ;;: point of this b_w var? */
   fib_u.bit_w = 0;
   u3i_slab_init(sab_u, 0, fib_u.a_w);
 

@@ -16,7 +16,7 @@ typedef uint8_t  ur_bool_t;
 */
 #define ur_fib10          55
 #define ur_fib11          89
-#define ur_fib12         144
+#define ur_fib12         144    /* ;;: TODO should this be an odd number for DWORD alignment sake? 144 + 3 = 147 */
 #define ur_fib27      196418
 #define ur_fib28      317811
 #define ur_fib33     3524578

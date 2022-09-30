@@ -3,6 +3,48 @@
 
 #include "manage.h"
 
+/* u3a_atom, u3a_cell: logical atom and cell structures.
+ */
+typedef struct {
+  c3_w mug_w;
+} u3a_noun;
+
+typedef struct {
+  c3_w mug_w;
+  c3_w len_w;
+  c3_w buf_w[0];
+} u3a_atom;
+
+typedef struct {
+  c3_w    mug_w;
+  u3_noun hed;
+  u3_noun tel;
+} u3a_cell;
+
+/* u3a_box: classic allocation box.
+**
+** The box size is also stored at the end of the box in classic
+** bad ass malloc style.  Hence a box is:
+**
+**    ---
+**    siz_w
+**    use_w
+**      user data
+**    siz_w
+**    ---
+**
+** Do not attempt to adjust this structure! -- If you do, sizeof(u3a_box) better
+** be a multiple of 8 and only append new members!
+*/
+typedef struct _u3a_box {
+  c3_w   siz_w;                       // size of this box
+  c3_w   use_w;                       // reference count; free if 0
+#       ifdef U3_MEMORY_DEBUG
+  c3_w   eus_w;                     // recomputed refcount
+  c3_w   cod_w;                     // tracing code
+#       endif
+} u3a_box;
+
   /**  Constants.
   **/
     /* u3a_bits: number of bits in word-addressed pointer.  29 == 2GB.
@@ -12,80 +54,48 @@
     /* u3a_page: number of bits in word-addressed page.  12 == 16K page (4 * 4K).
     */
 #     define u3a_page   12
+/* static const c3_w u3a_page = 12; */
 
     /* u3a_pages: maximum number of pages in memory.
     */
 #     define u3a_pages  (1 << (u3a_bits - u3a_page)) /* 0x40_000 */
+/* static const c3_w u3a_pages = 1 << (u3a_bits - u3a_page); */
 
     /* u3a_words: maximum number of words in memory.
     */
-#     define u3a_words  (1 << u3a_bits) /* 0x40_000_000 */
+/* #     define u3a_words  (1 << u3a_bits) /\* 0x40_000_000 *\/ */
+/* static const c3_w u3a_words = 1 << (u3a_bits + 1); */
+static const c3_w u3a_words = 1 << (u3a_bits);
 
     /* u3a_bytes: maximum number of bytes in memory.
     */
-#     define u3a_bytes  (sizeof(c3_w) * u3a_words) /* 0x100_000_000 = 4G */
-
-    /* u3a_cells: number of representable cells.
-    */
-#     define u3a_cells  (c3_w)(u3a_words / u3a_minimum) /* 0xaaaaaaa ~= 180_000_000 */
-
-    /* u3a_maximum: maximum loom object size (largest possible atom).
-    */
-#     define u3a_maximum   \
-        (c3_w)(u3a_words - (c3_wiseof(u3a_box) + c3_wiseof(u3a_atom)))
+/* #     define u3a_bytes  (sizeof(c3_w) * u3a_words) /\* 0x100_000_000 = 4G *\/ */
+static const c3_d u3a_bytes = sizeof(c3_w) * u3a_words;
 
     /* u3a_minimum: minimum loom object size (actual size of a cell).
     */
-#     define u3a_minimum   (c3_w)(1 + c3_wiseof(u3a_box) + c3_wiseof(u3a_cell)) /* 6W = 24B */
+/* #     define u3a_minimum   (c3_w)(1 + c3_wiseof(u3a_box) + c3_wiseof(u3a_cell)) /\* 6W = 24B *\/ */
+static const c3_w u3a_minimum = (c3_w)(1 + c3_wiseof(u3a_box) + c3_wiseof(u3a_cell));
+
+    /* u3a_cells: number of representable cells.
+    */
+/* #     define u3a_cells  (c3_w)(u3a_words / u3a_minimum) /\* 0xaaaaaaa ~= 180_000_000 *\/ */
+static const c3_w u3a_cells = (c3_w)(u3a_words / u3a_minimum);
+
+    /* u3a_maximum: maximum loom object size (largest possible atom).
+    */
+/* #     define u3a_maximum   \ */
+/*         (c3_w)(u3a_words - (c3_wiseof(u3a_box) + c3_wiseof(u3a_atom))) */
+static const c3_w u3a_maximum = (u3a_words - (c3_wiseof(u3a_box) + c3_wiseof(u3a_atom)));
 
     /* u3a_fbox_no: number of free lists per size.
     */
 #     define u3a_fbox_no   27   /* why 27? Perhaps because 16 = 1 << 4 and 31 - 4 = 27 */
+/* static const c3_w u3a_fbox_no = 27; */
 
 
   /**  Structures.
-  **/
-    /* u3a_atom, u3a_cell: logical atom and cell structures.
-    */
-      typedef struct {
-        c3_w mug_w;
-      } u3a_noun;
-
-      typedef struct {
-        c3_w mug_w;
-        c3_w len_w;
-        c3_w buf_w[0];
-      } u3a_atom;
-
-      typedef struct {
-        c3_w    mug_w;
-        u3_noun hed;
-        u3_noun tel;
-      } u3a_cell;
-
-    /* u3a_box: classic allocation box.
-    **
-    ** The box size is also stored at the end of the box in classic
-    ** bad ass malloc style.  Hence a box is:
-    **
-    **    ---
-    **    siz_w
-    **    use_w
-    **      user data
-    **    siz_w
-    **    ---
-    **
-    ** Do not attempt to adjust this structure!
-    */
-      typedef struct _u3a_box {
-        c3_w   siz_w;                       // size of this box
-        c3_w   use_w;                       // reference count; free if 0
-#       ifdef U3_MEMORY_DEBUG
-          c3_w   eus_w;                     // recomputed refcount
-          c3_w   cod_w;                     // tracing code
-#       endif
-      } u3a_box;
-
+   **/
     /* u3a_fbox: free node in heap.  Sets minimum node size.
     */
       typedef struct _u3a_fbox { /* free list node. doubly linked */
@@ -217,9 +227,10 @@
     */
 /* #     define  u3a_into(x) ((void *)(u3_Loom + (x))) */
 inline void *u3a_into(c3_w x) {
-  /* return ((uintptr_t)u3_Loom) + x; */
+  /* if (BSIMSUM_DEBUG && ((~x) & (x + 1)) != 1) */
+  /*   __asm__ volatile("int $0x03"); */
   return u3_Loom + x;
-  /* return (void *)(c3_d)x; */
+  /* return u3_Loom + (x << 1); */
 }
 /* # define u3a_into(x) (u3a_into(x)) */
 
@@ -227,7 +238,12 @@ inline void *u3a_into(c3_w x) {
     */
 /* #     define  u3a_outa(p) (((c3_w*)(void*)(p)) - u3_Loom) */
 inline c3_w u3a_outa(void *p) {
+  c3_w ret = ((c3_w *)p) - u3_Loom;
+  /* if (BSIMSUM_DEBUG && ((~ret) & (ret + 1)) != 1) */
+  /*   __asm__ volatile("int $0x03"); */
+  return ret;
   return ((c3_w *)p) - u3_Loom;
+  /* return (((c3_w *)p) - u3_Loom) >> 1; */
 }
 /* # define u3a_outa(p) (u3a_outa(p)) */
 

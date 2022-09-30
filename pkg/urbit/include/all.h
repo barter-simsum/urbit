@@ -1,3 +1,5 @@
+#define BSIMSUM_DEBUG 1
+
 #   include "config.h"
   /** c3: C environment.
   **/

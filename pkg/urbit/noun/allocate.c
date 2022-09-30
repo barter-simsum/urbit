@@ -87,6 +87,12 @@ _box_make(void* box_v, c3_w siz_w, c3_w use_w)
   box_w[siz_w - 1] = siz_w;     /* stor size at end of allocation as well */
   box_u->use_w = use_w;
 
+  /* if (((~u3a_botox(ptr_v)->siz_w) & (u3a_botox(ptr_v)->siz_w + 1)) != 1) */
+  if (BSIMSUM_DEBUG && ((~(uintptr_t)box_v) & ((uintptr_t)box_v + 1)) != 1)
+    __asm__ volatile("int $0x03");
+  if (BSIMSUM_DEBUG && ((~box_u->siz_w) & (box_u->siz_w + 1)) != 1)
+    __asm__ volatile("int $0x03");
+
 # ifdef  U3_MEMORY_DEBUG
     box_u->cod_w = u3_Code;
     box_u->eus_w = 0;
@@ -177,6 +183,12 @@ _box_free(u3a_box* box_u)
     return;
   }
 
+  if (BSIMSUM_DEBUG && ((~box_u->siz_w) & (box_u->siz_w + 1)) != 1)
+    __asm__ volatile("int $0x03"); /* DWORD sized */
+  /* if (BSIMSUM_DEBUG && ((~(uintptr_t)box_u) & ((uintptr_t)box_u - 1)) != 7) */
+  if (BSIMSUM_DEBUG && ((~((uintptr_t)box_u >> 2)) & (((uintptr_t)box_u >> 2) + 1)) != 1)
+    __asm__ volatile("int $0x03"); /* 8 byte aligned */
+
 #if 0
   /* Clear the contents of the block, for debugging.
   */
@@ -189,12 +201,12 @@ _box_free(u3a_box* box_u)
   }
 #endif
 
-  if ( c3y == u3a_is_north(u3R) ) {
+  if ( c3y == u3a_is_north(u3R) ) { /* north */
     /* Try to coalesce with the block below.
     */
     if ( box_w != u3a_into(u3R->rut_p) ) {
-      c3_w       laz_w = *(box_w - 1);
-      u3a_box* pox_u = (u3a_box*)(void *)(box_w - laz_w);
+      c3_w       laz_w = *(box_w - 1); /* the size of a box stored at the end of its allocation */
+      u3a_box* pox_u = (u3a_box*)(void *)(box_w - laz_w); /* the head of the adjacent box below */
 
       if ( 0 == pox_u->use_w ) {
         _box_detach(pox_u);
@@ -219,8 +231,8 @@ _box_free(u3a_box* box_u)
       }
       _box_attach(box_u);
     }
-  }
-  else {
+  } /* end north */
+  else {                        /* south */
     /* Try to coalesce with the block above.
     */
     if ( (box_w + box_u->siz_w) != u3a_into(u3R->rut_p) ) {
@@ -248,7 +260,7 @@ _box_free(u3a_box* box_u)
       }
       _box_attach(box_u);
     }
-  }
+  } /* end south */
 }
 
 /* _me_align_pad(): pad to first point after pos_p aligned at (ald_w, alp_w).
@@ -315,25 +327,25 @@ static u3a_box*
 _ca_box_make_hat(c3_w len_w, c3_w ald_w, c3_w alp_w, c3_w use_w)
 {
   c3_w    pad_w, siz_w;
-  u3_post all_p;
+  u3_post all_p = u3R->hat_p;
 
   if ( c3y == u3a_is_north(u3R) ) { /* north: 00 ~~~~rut----hat####SSS~~~~ FF */
-    all_p = u3R->hat_p;
     pad_w = _me_align_pad(all_p, ald_w, alp_w);
     siz_w = (len_w + pad_w);
+    siz_w += 1; siz_w &= ~1;    /* ;;: only allocate even sized chunks */
 
     //  hand-inlined: siz_w >= u3a_open(u3R)
     //
-    if ( (siz_w >= (u3R->cap_p - u3R->hat_p)) ) { /* size greater than free space */
+    if ( (siz_w >= (u3R->cap_p - u3R->hat_p)) ) { /* size greater than free space ;;: TODO change this to use the freespace macro */
       return 0;                 /* because not possible */
     }
     u3R->hat_p = (all_p + siz_w); /* otherwise, extend hat by siz_w (alloc len + pad) */
   }
   else {                        /* south: 00 ~~~~SSS####hat----rut~~~~ FF */
-    all_p = (u3R->hat_p - len_w);
-    pad_w = _me_align_dap(all_p, ald_w, alp_w);
+    pad_w = _me_align_dap(((all_p - len_w) + 1) & ~1, ald_w, alp_w);
     siz_w = (len_w + pad_w);
-    all_p -= pad_w;
+    siz_w += 1; siz_w &= ~1;    /* ;;: only allocate even sized chunks */
+    all_p -= siz_w;
 
     //  hand-inlined: siz_w >= u3a_open(u3R)
     //
@@ -342,6 +354,21 @@ _ca_box_make_hat(c3_w len_w, c3_w ald_w, c3_w alp_w, c3_w use_w)
     }
     u3R->hat_p = all_p;
   }
+
+  /* { */
+  /*   all_p = (u3R->hat_p - len_w); */
+  /*   pad_w = _me_align_dap(all_p, ald_w, alp_w); */
+  /*   siz_w = (len_w + pad_w); */
+  /*   all_p -= pad_w; */
+
+  /*   //  hand-inlined: siz_w >= u3a_open(u3R) */
+  /*   // */
+  /*   if ( siz_w >= (u3R->hat_p - u3R->cap_p) ) { */
+  /*     return 0; */
+  /*   } */
+  /*   u3R->hat_p = all_p; */
+  /* } */
+
   return _box_make(u3a_into(all_p), siz_w, use_w);
 }
 
@@ -527,6 +554,7 @@ _ca_willoc(c3_w len_w, c3_w ald_w, c3_w alp_w)
           ** from the free list.
           */
           siz_w += pad_w;
+          siz_w += 1; siz_w &= ~1;    /* ;;: only allocate even sized chunks */
           _box_count(-(box_u->siz_w)); /* a debug macro */
           {
             if ( (0 != u3to(u3a_fbox, *pfr_p)->pre_p) &&
@@ -543,18 +571,19 @@ _ca_willoc(c3_w len_w, c3_w ald_w, c3_w alp_w)
               c3_assert(!"loom: corrupt");
             } /* basic free list consistency checking in asserts above */
 
-            if ( 0 != u3to(u3a_fbox, *pfr_p)->nex_p ) {
-              u3to(u3a_fbox, u3to(u3a_fbox, *pfr_p)->nex_p)->pre_p =
-                u3to(u3a_fbox, *pfr_p)->pre_p;
+            if ( 0 != u3to(u3a_fbox, *pfr_p)->nex_p ) { /* if next free box not null */
+              u3to(u3a_fbox, u3to(u3a_fbox, *pfr_p)->nex_p)->pre_p = /* then this.next.prev = this.prev */
+                u3to(u3a_fbox, *pfr_p)->pre_p;                       /* cuz we're unlinking this box */
             }
-            *pfr_p = u3to(u3a_fbox, *pfr_p)->nex_p;
+            *pfr_p = u3to(u3a_fbox, *pfr_p)->nex_p; /* bump allocator. head = head.next */
           }
 
           /* If we can chop off another block, do it.
           */
-          if ( (siz_w + u3a_minimum) <= box_u->siz_w ) {
+          /* if ( (((siz_w + 1) & 2) + u3a_minimum) <= box_u->siz_w ) { /\* ;;:This _is_ what's causing allocs to return non 2-word aligned pointers We need to split with padding. And grow the size of the alloc I guess. *\/ */
             /* Split the block.
             */
+          if (( siz_w + u3a_minimum) <= box_u->siz_w ) {
             c3_w* box_w = ((c3_w *)(void *)box_u);
             c3_w* end_w = box_w + siz_w;
             c3_w  lef_w = (box_u->siz_w - siz_w);
@@ -584,6 +613,7 @@ _ca_walloc(c3_w len_w, c3_w ald_w, c3_w alp_w)
 {
   void* ptr_v;
 
+  len_w |= 1;                    /* ;;:TODO. REFACTOR hacky. we only permit odd word-length allocations */
   while ( 1 ) {
     ptr_v = _ca_willoc(len_w, ald_w, alp_w);
     if ( 0 != ptr_v ) {
@@ -591,6 +621,8 @@ _ca_walloc(c3_w len_w, c3_w ald_w, c3_w alp_w)
     }
     _ca_reclaim_half();
   }
+  if (BSIMSUM_DEBUG && ((~u3a_botox(ptr_v)->siz_w) & (u3a_botox(ptr_v)->siz_w + 1)) != 1)
+    __asm__ volatile("int $0x03");
   return ptr_v;
 }
 
@@ -601,6 +633,8 @@ u3a_walloc(c3_w len_w)
 {
   void* ptr_v;
 
+  /* len_w += 1; len_w &= ~(c3_w)1; /\* ;;:TODO. REFACTOR This is a _hack_ *\/ */
+  /* len_w |= 1;                    /\* ;;:TODO. REFACTOR hacky. we only permit odd word-length allocations *\/ */
   ptr_v = _ca_walloc(len_w, 1, 0);
 
 #if 0
@@ -617,6 +651,8 @@ u3a_walloc(c3_w len_w)
     xuc_i++;
   }
 #endif
+  if (BSIMSUM_DEBUG && ((~u3a_botox(ptr_v)->siz_w) & (u3a_botox(ptr_v)->siz_w + 1)) != 1)
+    __asm__ volatile("int $0x03");
   return ptr_v;
 }
 
@@ -625,6 +661,8 @@ u3a_walloc(c3_w len_w)
 void*
 u3a_wealloc(void* lag_v, c3_w len_w)
 {
+  /* len_w += 1; len_w &= ~(c3_w)1; /\* ;;:TODO. REFACTOR This is a _hack_ *\/ */
+  len_w |= 1;                    /* ;;:TODO. REFACTOR hacky. we only permit odd length allocations */
   if ( !lag_v ) {
     return u3a_malloc(len_w);
   }
@@ -674,6 +712,50 @@ u3a_wfree(void* tox_v)
 
 /* u3a_wtrim(): trim storage.
 */
+#if 1
+void
+u3a_wtrim(void* tox_v, c3_w old_w, c3_w len_w)
+{
+  c3_w* nov_w = tox_v;
+
+  if (  (old_w > len_w)
+     && ((old_w - len_w) >= u3a_minimum) ) /* ;;: TODO add condition -- if length freed is DWORD sized */
+  {                                        /* u3a_botox(nov_w)->siz_w is actual size;;; end_w - box_w is desired size (smaller) */
+    c3_w*    box_w;
+    u3a_box* box_u;
+    box_w = box_u = (void *)u3a_botox(nov_w); /* ;;: TODO fix pointer conversion warning */
+
+    c3_w* end_w = ((uintptr_t)(nov_w + len_w + 1) + 7) & ~7; /* desired alloc end +1 (tail size), +1 & ~1 (alignment) */
+    if (BSIMSUM_DEBUG && end_w >= (box_w + box_u->siz_w)) {
+      __asm__ volatile("int $0x03");
+      return;      
+    }
+    c3_w  asz_w = (end_w - box_w);
+    if (BSIMSUM_DEBUG && asz_w != ((end_w - box_w + 1) & ~1))
+      __asm__ volatile("int $0x03");
+    c3_w  bsz_w = box_u->siz_w - asz_w; /* size diff between current and desired */
+
+    if (BSIMSUM_DEBUG && end_w >= (box_w + box_u->siz_w))
+      __asm__ volatile("int $0x03");
+    if (BSIMSUM_DEBUG && asz_w == 0)
+      __asm__ volatile("int $0x03");
+
+    if (BSIMSUM_DEBUG && ((~asz_w) & (asz_w + 1)) != 1)
+      __asm__ volatile("int $0x03"); /* new allocation size not DWORD multiple */
+    if (BSIMSUM_DEBUG && (((uintptr_t)end_w) & 7) != 0)
+      __asm__ volatile("int $0x03"); /* freed end is not DWORD aligned */
+    if (BSIMSUM_DEBUG && ((~bsz_w) & (bsz_w + 1)) != 1)
+      __asm__ volatile("int $0x03"); /* freed end is not DWORD multiple */
+    
+    _box_attach(_box_make(end_w, bsz_w, 0)); /* free the unneeded space */
+
+    box_u->siz_w = asz_w;
+    box_w[asz_w - 1] = asz_w;
+  }
+}
+#endif
+
+#if 0
 void
 u3a_wtrim(void* tox_v, c3_w old_w, c3_w len_w)
 {
@@ -682,10 +764,15 @@ u3a_wtrim(void* tox_v, c3_w old_w, c3_w len_w)
   if (  (old_w > len_w)
      && ((old_w - len_w) >= u3a_minimum) )
   {
-    c3_w* box_w = (void *)u3a_botox(nov_w);
+    c3_w* box_w;
+    u3a_box* box_u;
+    box_w = box_u = (void *)u3a_botox(nov_w);
     c3_w* end_w = (nov_w + len_w + 1);
     c3_w  asz_w = (end_w - box_w);
     c3_w  bsz_w = box_w[0] - asz_w;
+
+    /* if (BSIMSUM_DEBUG && ((~box_u->siz_w) & (box_u->siz_w + 1)) != 1) */
+    /*   __asm__ volatile("int $0x03"); */
 
     _box_attach(_box_make(end_w, bsz_w, 0));
 
@@ -693,6 +780,7 @@ u3a_wtrim(void* tox_v, c3_w old_w, c3_w len_w)
     box_w[asz_w - 1] = asz_w;
   }
 }
+#endif
 
 /* u3a_calloc(): allocate and zero-initialize array
 */
@@ -714,6 +802,7 @@ u3a_calloc(size_t num_i, size_t len_i)
 void*
 u3a_malloc(size_t len_i)
 {
+  /* len_w += 3; len_w &= ~(c3_w)3; /\* ;;:TODO. REFACTOR hacky. We only permit odd word-length allocations *\/ */
   c3_w    len_w = (c3_w)((len_i + 3) >> 2); /* ;;: eq len_i / sizeof(c3_w). kinda bad, makes assumptions about sizeof c3_w. Like many places in code. */
   c3_w*   ptr_w = _ca_walloc(len_w + 1, 4, 3); /* ;;: ald_w=4, alp_w=3 => in willoc: ald_w=4, alp_w=1 */
   u3_post ptr_p = u3a_outa(ptr_w);
