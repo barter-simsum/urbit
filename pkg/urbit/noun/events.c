@@ -221,7 +221,7 @@ u3e_fault(void* adr_v, c3_i ser_i)
     return 0;
   }
 
-  u3p(c3_w) adr_p  = u3a_outa(adr_w);
+  u3p(c3_w) adr_p  = adr_w - u3_Loom; /* ;;: "hand-inlined" to avoid calling u3a_outa on non DWORD aligned pointers */
   c3_w      pag_w  = adr_p >> u3a_page;
   c3_w      blk_w  = (pag_w >> 5);
   c3_w      bit_w  = (pag_w & 31);

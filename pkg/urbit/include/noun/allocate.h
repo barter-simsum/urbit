@@ -273,15 +273,17 @@ inline void* c3_align_p(void const * p, size_t al, align_dir hilo) {
     /* u3a_into(): convert loom offset [x] into generic pointer.
     */
 inline void *u3a_into(c3_w x) {
-  /* return ((uintptr_t)u3_Loom) + x; */
-  return u3_Loom + x;
-  /* return (void *)(c3_d)x; */
+  c3_w *ret = u3_Loom + x;
+  c3_dessert(((uintptr_t)ret & u3a_balign-1) == 0);
+  return ret;
 }
 
     /* u3a_outa(): convert pointer [p] into word offset into loom.
     */
 inline c3_w u3a_outa(void *p) {
-  return ((c3_w *)p) - u3_Loom;
+  c3_w ret = ((c3_w *)p) - u3_Loom;
+  c3_dessert((ret & u3a_walign-1) == 0);
+  return ret;
 }
 
     /* Inside a noun.
@@ -452,8 +454,8 @@ inline c3_w *u3a_to_wtr(c3_w som) {
   do {                                                                  \
     c3_dessert(((uintptr_t)((u3a_road*)(rod_u))->hat_p                  \
                 & u3a_walign-1) == 0);                                  \
-    /* c3_dessert(((uintptr_t)((u3a_road*)(rod_u))->cap_p */                  \
-                /* & u3a_walign-1) == 0); */                                  \
+    c3_dessert(((uintptr_t)((u3a_road*)(rod_u))->cap_p                  \
+                & u3a_walign-1) == 0);                                  \
   } while(0)
 
 
