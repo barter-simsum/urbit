@@ -20,7 +20,7 @@
         u3a_road rod_u;                   //  storage state
         u3v_arvo arv_u;                   //  arvo state
         c3_w     ver_w;                   //  version number
-      } u3v_home;
+      } u3v_home;                         /* ;;: TODO do we need to assert that this is dword-sized? It currently is (0x160). No I don't think so. mat_p in u3R should be adjusted accordingly. Regardless of whether the size is a dword multiple */
 
 
   /**  Globals.

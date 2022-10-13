@@ -920,7 +920,7 @@
 
 /* _stir_pair(): stack frame recording intermediate parse results
 */
-  typedef struct {
+  typedef struct {              /* ;;:FRAME */
     u3_noun har;  //  hair, p_vex
     u3_noun res;  //  parse-result, puq_vex
   } _stir_pair;

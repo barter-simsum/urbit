@@ -185,9 +185,9 @@ static const c3_w u3a_maximum = (u3a_words - (c3_wiseof(u3a_box) + c3_wiseof(u3a
     /* u3a_pile: stack control, abstracted over road direction.
     */
       typedef struct _u3a_pile {
-        c3_ws    mov_ws;
-        c3_ws    off_ws;
-        u3_post   top_p;
+        c3_ws    mov_ws;        /* north: -len, south: +len -- size of stack in words I guess */
+        c3_ws    off_ws;        /* north:    0, south: -len */
+        u3_post   top_p;        /* = u3R->cap_p */
 #ifdef U3_MEMORY_DEBUG
         u3a_road* rod_u;
 #endif
@@ -227,11 +227,12 @@ static const c3_w u3a_maximum = (u3a_words - (c3_wiseof(u3a_box) + c3_wiseof(u3a
     */
 /* #     define  u3a_into(x) ((void *)(u3_Loom + (x))) */
 inline void *u3a_into(c3_w x) {
-  /* if (BSIMSUM_DEBUG && ((~x) & (x + 1)) != 1) */
-  /*   __asm__ volatile("int $0x03"); */
-  return u3_Loom + x;
-  /* return u3_Loom + (x << 1); */
+  c3_w *ret = u3_Loom + x;
+  if (BSIMSUM_DEBUG && ((uintptr_t)ret & 0x7U) != 0)
+      __asm__ volatile("int $0x03");
+  return ret;
 }
+
 /* # define u3a_into(x) (u3a_into(x)) */
 
     /* u3a_outa(): convert pointer [p] into word offset into loom.
@@ -239,12 +240,11 @@ inline void *u3a_into(c3_w x) {
 /* #     define  u3a_outa(p) (((c3_w*)(void*)(p)) - u3_Loom) */
 inline c3_w u3a_outa(void *p) {
   c3_w ret = ((c3_w *)p) - u3_Loom;
-  /* if (BSIMSUM_DEBUG && ((~ret) & (ret + 1)) != 1) */
-  /*   __asm__ volatile("int $0x03"); */
+  if (BSIMSUM_DEBUG && (ret & 0x1U) != 0)
+    __asm__ volatile("int $0x03");
   return ret;
-  return ((c3_w *)p) - u3_Loom;
-  /* return (((c3_w *)p) - u3_Loom) >> 1; */
 }
+
 /* # define u3a_outa(p) (u3a_outa(p)) */
 
     /* Inside a noun.
@@ -436,14 +436,14 @@ inline c3_w *u3a_to_wtr(c3_w som) {
           inline void*
           u3a_push(const u3a_pile* pil_u)
           {
-            u3R->cap_p += pil_u->mov_ws;
+            u3R->cap_p += pil_u->mov_ws; /* ;;: increment cap by size of stack frame. (negative if north) */
 
 #ifndef U3_GUARD_PAGE
             //  !off means we're on a north road
             //
             if ( !pil_u->off_ws ) {
               if( !(u3R->cap_p > u3R->hat_p) ) {
-                u3m_bail(c3__meme);
+                u3m_bail(c3__meme); /* ;;: ignore: loom consistency check */
               }
 # ifdef U3_MEMORY_DEBUG
               c3_assert( pil_u->top_p >= u3R->cap_p );
@@ -451,7 +451,7 @@ inline c3_w *u3a_to_wtr(c3_w som) {
             }
             else {
               if( !(u3R->cap_p < u3R->hat_p) ) {
-                u3m_bail(c3__meme);
+                u3m_bail(c3__meme); /* ;;: ignore: loom consistency check */
               }
 # ifdef U3_MEMORY_DEBUG
               c3_assert( pil_u->top_p <= u3R->cap_p );

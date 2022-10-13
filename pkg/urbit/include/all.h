@@ -1,4 +1,6 @@
-#define BSIMSUM_DEBUG 1
+#define BSIMSUM_DEBUG 1         /* ;;:you should of course remove this and its usages. Consider retaining ifdef wrapped breakpoint interrupt in u3a_into, u3a_outa. Bundle this into a ASSERT macro that no-ops when symbol doesn't exist. */
+#define U3_CPU_DEBUG  1
+#define VERBOSE_BYTECODE 1
 
 #   include "config.h"
   /** c3: C environment.

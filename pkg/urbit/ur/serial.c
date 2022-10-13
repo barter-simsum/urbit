@@ -159,7 +159,7 @@ ur_jam(ur_root_t  *r,
 
 #define CUE_HEAD 0xffffffffffffffffULL
 
-typedef struct _cue_frame_s {
+typedef struct _cue_frame_s {   /* ;;:FRAME -- multiple defs of _cue_frame_s in serial.c */
   uint64_t  ref;
   uint64_t bits;
 } _cue_frame_t;
@@ -394,7 +394,7 @@ ur_cue(ur_root_t       *r,
 **
 */
 
-typedef struct _cue_test_frame_s {
+typedef struct _cue_test_frame_s { /* ;;:FRAME -- how does relate to _cue_frame_s in serial.c? */
   ur_bool_t tal;
   uint64_t bits;
 } _cue_test_frame_t;

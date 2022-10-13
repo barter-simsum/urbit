@@ -274,7 +274,7 @@ u3s_jam_xeno(u3_noun a, c3_d* len_d, c3_y** byt_y)
 
 /* _cs_cue: stack frame for tracking intermediate cell results
 */
-typedef struct _cs_cue {
+typedef struct _cs_cue {        /* ;;FRAME */
   u3_weak hed;  //  head of a cell or u3_none
   u3_atom wid;  //  bitwidth of [hed] or 0
   u3_atom cur;  //  bit-cursor position
@@ -429,7 +429,7 @@ u3s_cue(u3_atom a)
 **    $?  [u3_none bits=@]
 **    [hed=* bits=@]
 */
-typedef struct _cue_frame_s {
+typedef struct _cue_frame_s {   /* ;;:FRAME -- how does relate to _cu_frame_s? (urth.c). Multiple defs of _cue_frame_s in serial.c */
   u3_weak ref;
   c3_d  bit_d;
 } _cue_frame_t;

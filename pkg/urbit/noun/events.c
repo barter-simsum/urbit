@@ -262,7 +262,8 @@ u3e_fault(void* adr_v, c3_i ser_i)
     return 0;
   }
 
-  u3p(c3_w) adr_p  = u3a_outa(adr_w);
+  /* u3p(c3_w) adr_p  = u3a_outa(adr_w); /\* ;;: ok, so issue is that this code path can be invoked on any arbitrary mem location inside the loom. For instance, we see the first break in manage.c::_find_home where we set the value of u3R->mat_p (mem loc 0x2fffffa94) to u3C.wor_i - c3_wiseof(*u3H) *\/ */
+  u3p(c3_w) adr_p  = adr_w - u3_Loom; /* ;;: TODO shall we provide a u3a_into, u3a_outa like api for general non dword aligned loomref<->memloc conversions? It could be used here. */
   c3_w      pag_w  = adr_p >> u3a_page;
   c3_w      blk_w  = (pag_w >> 5);
   c3_w      bit_w  = (pag_w & 31);

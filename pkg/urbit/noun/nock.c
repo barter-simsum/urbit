@@ -1998,7 +1998,7 @@ _n_kale(u3_noun a)
   return a;
 }
 
-typedef struct {
+typedef struct {                /* ;;:FRAME */
   u3n_prog* pog_u;
   c3_w     ip_w;
 } burnframe;
@@ -2754,13 +2754,14 @@ static u3_noun
 _n_burn_out(u3_noun bus, u3n_prog* pog_u)
 {
   c3_ys mov, off;
+  /* ;;: TODO cleanup constants maybe */
   if ( c3y == u3a_is_north(u3R) ) {
-    mov = -1;
+    mov = -2;
     off = 0;
   }
   else {
-    mov = 1;
-    off = -1;
+    mov = 2;
+    off = -2;
   }
   return _n_burn(pog_u, bus, mov, off);
 }

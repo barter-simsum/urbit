@@ -88,7 +88,7 @@ _cu_box_stash(u3a_noun* som_u, ur_nref ref)
 #define LOM_HEAD 0xffffffffffffffffULL
 
 typedef struct _cu_frame_s
-{
+{                               /* ;;:FRAME -- how does relate to _cue_frame_s? (serial.c) */
   ur_nref     ref;
   u3a_cell* cel_u;
 } _cu_frame;

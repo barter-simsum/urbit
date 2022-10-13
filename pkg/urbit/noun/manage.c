@@ -508,8 +508,10 @@ _pave_road(c3_w* rut_w, c3_w* mat_w, c3_w* cap_w, c3_w siz_w)
   rod_u->mat_p = u3of(c3_w, mat_w);  //  stack bottom
   rod_u->cap_p = u3of(c3_w, cap_w);  //  stack top
 
-  if (BSIMSUM_DEBUG && ((~rod_u->hat_p) & (rod_u->hat_p + 1)) != 1)
-    __asm__ volatile("int $0x03");
+  if (BSIMSUM_DEBUG && (rod_u->hat_p & 0x1U) != 0)
+    __asm__ volatile("int $0x03"); /* hat is not dword aligned */
+  if (BSIMSUM_DEBUG && (rod_u->cap_p & 0x1U) != 0)
+    __asm__ volatile("int $0x03"); /* cap is not dword aligned */
 
   fprintf(stderr, "_pave_road rut_p: 0x%x, hat_p: 0x%x, cap_p: 0x%x, mat_p: 0x%x\r\n",
           rod_u->rut_p, rod_u->hat_p, rod_u->cap_p, rod_u->mat_p);
@@ -554,8 +556,9 @@ _pave_south(c3_w* mem_w, c3_w siz_w, c3_w len_w)
   c3_d  adj_d = sizeof(c3_w) << 1; /* 2 word aligned */
   c3_w* mat_w = mem_w;
   mat_w = ((uintptr_t)mat_w + (adj_d - 1)) & ~(adj_d - 1); /* high align 2 word */
-  c3_w* cap_w = mat_w + siz_w;  /* 00~~~|M|+++|C|######|H|---|R|~~~FFF */
-                                /*      ^---u3R which _pave_road returns */
+  c3_w* cap_w = mat_w + siz_w;                             /* 00~~~|M|+++|C|######|H|---|R|~~~FFF */
+  cap_w = ((uintptr_t)cap_w + (adj_d - 1) & ~(adj_d - 1)); /*      ^---u3R which _pave_road returns */
+
 
   c3_w* rut_w = (void*)(((uintptr_t)(mem_w + len_w)) & ~(adj_d - 1)); /* low align 2 word */
 
@@ -611,8 +614,10 @@ _find_home(void)
   u3H = (void *)mat_w;
   u3R = &u3H->rod_u;
 
-  if (BSIMSUM_DEBUG && ((~u3R->hat_p) & (u3R->hat_p + 1)) != 1)
+  if (BSIMSUM_DEBUG && ((~u3R->hat_p) & (u3R->hat_p + 1)) != 1) {
+    fprintf(stderr, "==HERE HERE HERE\n");
     __asm__ volatile("int $0x03");
+  }
 
   //  this looks risky, but there are no legitimate scenarios
   //  where it's wrong

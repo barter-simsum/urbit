@@ -686,11 +686,13 @@ u3a_wealloc(void* lag_v, c3_w len_w)
 /* u3a_pile_prep(): initialize stack control.
 */
 void
-u3a_pile_prep(u3a_pile* pil_u, c3_w len_w)
+u3a_pile_prep(u3a_pile* pil_u, c3_w len_i)
 {
   //  frame size, in words
   //
-  c3_w wor_w = (len_w + 3) >> 2;
+  len_i += 0x7U;
+  len_i &= ~0x7U;
+  c3_w wor_w = (len_i + 3) >> 2; /* ;;:TODO. use sizeof(u3_w). -- maybe or c3_wiseof in caller? */
   c3_o nor_o = u3a_is_north(u3R);
 
   pil_u->mov_ws = (c3y == nor_o) ? -wor_w :  wor_w;
@@ -1203,8 +1205,8 @@ _ca_take_cell(u3a_cell* old_u, u3_noun hed, u3_noun tel)
 /* _ca_take: stack frame for recording cell travesal
 **           (u3_none == hed) == head-frame
 */
-typedef struct _ca_take
-{
+typedef struct _ca_take         /* ;;:FRAME */
+{                               /* 64 bit (DWORD multiple) */
   u3_weak hed;  //  taken head
   u3_cell old;  //  old cell
 } _ca_take;

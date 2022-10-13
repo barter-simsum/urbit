@@ -239,7 +239,7 @@ u3r_mean(u3_noun som, ...)
 #define SING_HEAD 1
 #define SING_TAIL 2
 
-typedef struct {
+typedef struct {                /* ;;:FRAME */
   c3_y     sat_y;
   u3_noun  a;
   u3_noun  b;
@@ -469,7 +469,7 @@ _cr_sing(u3_noun a, u3_noun b)
 
   //  initialize stack control, push arguments onto the stack (none-frame)
   //
-  u3a_pile_prep(&pil_u, sizeof(eqframe));
+  u3a_pile_prep(&pil_u, sizeof(*fam_u));
   fam_u = _cr_sing_push(&pil_u, a, b);
 
   //  loop while arguments are on the stack
@@ -1689,7 +1689,7 @@ u3r_mug_words(const c3_w* key_w, c3_w len_w)
 /* _cr_mug: stack frame for recording cell traversal
 **          !mug == head-frame
 */
-typedef struct {
+typedef struct {                /* ;;:FRAME */
   c3_l  mug_l;
   u3_cell cel;
 } _cr_mugf;
