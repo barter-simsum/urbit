@@ -11,6 +11,11 @@
 #include <openssl/crypto.h>
 #include <urcrypt.h>
 
+#if BSIMSUM_DEBUG && MEASURE_STACK
+static size_t leap_depf    = 0;
+static size_t ref_point    = 0;
+#endif
+
 //  XX stack-overflow recovery should be gated by -a
 //
 #undef NO_OVERFLOW
@@ -508,13 +513,13 @@ _pave_road(c3_w* rut_w, c3_w* mat_w, c3_w* cap_w, c3_w siz_w)
   rod_u->mat_p = u3of(c3_w, mat_w);  //  stack bottom
   rod_u->cap_p = u3of(c3_w, cap_w);  //  stack top
 
-  if (BSIMSUM_DEBUG && (rod_u->hat_p & 0x1U) != 0)
-    __asm__ volatile("int $0x03"); /* hat is not dword aligned */
-  if (BSIMSUM_DEBUG && (rod_u->cap_p & 0x1U) != 0)
-    __asm__ volatile("int $0x03"); /* cap is not dword aligned */
+  /* if (BSIMSUM_DEBUG && (rod_u->hat_p & 0x1U) != 0) */
+  /*   __asm__ volatile("int $0x03"); /\* hat is not dword aligned *\/ */
+  /* if (BSIMSUM_DEBUG && (rod_u->cap_p & 0x1U) != 0) */
+  /*   __asm__ volatile("int $0x03"); /\* cap is not dword aligned *\/ */
 
-  fprintf(stderr, "_pave_road rut_p: 0x%x, hat_p: 0x%x, cap_p: 0x%x, mat_p: 0x%x\r\n",
-          rod_u->rut_p, rod_u->hat_p, rod_u->cap_p, rod_u->mat_p);
+  /* fprintf(stderr, "_pave_road rut_p: 0x%x, hat_p: 0x%x, cap_p: 0x%x, mat_p: 0x%x\r\n", */
+  /*         rod_u->rut_p, rod_u->hat_p, rod_u->cap_p, rod_u->mat_p); */
   return rod_u;
 }
 
@@ -529,7 +534,7 @@ _pave_north(c3_w* mem_w, c3_w siz_w, c3_w len_w)
   //    the stack starts at the end of the memory segment,
   //    minus space for the road structure [siz_w]
   //
-  printf("PAVE NORTH\n");
+  /* printf("PAVE NORTH\n"); */
   c3_d  adj_d = sizeof(c3_w) << 1; /* 2 word aligned ;;: TODO make this a constant somewhere */
   c3_w* mat_w = ((mem_w + len_w) - siz_w);
   mat_w = (void *)(((uintptr_t)mat_w) & ~(adj_d - 1)); /* low align 2 word */
@@ -552,7 +557,7 @@ _pave_south(c3_w* mem_w, c3_w siz_w, c3_w len_w)
   //    the stack starts at the base memory pointer [mem_w],
   //    and ends after the space for the road structure [siz_w]
   //
-  printf("PAVE SOUTH\n");
+  /* printf("PAVE SOUTH\n"); */
   c3_d  adj_d = sizeof(c3_w) << 1; /* 2 word aligned */
   c3_w* mat_w = mem_w;
   mat_w = ((uintptr_t)mat_w + (adj_d - 1)) & ~(adj_d - 1); /* high align 2 word */
@@ -814,8 +819,21 @@ u3m_leap(c3_w pad_w)
   c3_w     len_w;               /* the length of the new road (avail - (pad [4M] + wiseof(u3a_road))) */
   u3_road* rod_u;
 
-  if (BSIMSUM_DEBUG && ((~u3R->hat_p) & (u3R->hat_p + 1)) != 1)
-    __asm__ volatile("int $0x03");
+#if BSIMSUM_DEBUG && MEASURE_STACK
+  fprintf(stderr, "LEAP, new depth: %zu, refpoint: %zu\r\n", ++leap_depf, ++ref_point);
+  u3a_road* cur_u = u3R;
+  size_t    stak_w = 0;
+  for (u3a_road* cur_u = u3R
+         ; u3a_outa(cur_u)
+         ; cur_u = u3to(u3_road, cur_u->par_p))
+    stak_w += u3a_temp(cur_u);
+  fprintf(stderr, "\ttotal stack size: 0x%zuW, 0x%zuK\r\n", stak_w, stak_w >> 8);
+#endif
+
+  /* u3R = u3to(u3_road, u3R->par_p); */
+
+  /* if (BSIMSUM_DEBUG && ((~u3R->hat_p) & (u3R->hat_p + 1)) != 1) */
+  /*   __asm__ volatile("int $0x03"); */
   /* Measure the pad - we'll need it.
   */
   {
@@ -844,7 +862,7 @@ u3m_leap(c3_w pad_w)
       bot_p = u3R->hat_p + pad_w;
 
       rod_u = _pave_south(u3a_into(bot_p), c3_wiseof(u3a_road), len_w);
-#if 1
+#if 0
       fprintf(stderr, "NPAR.hat_p: 0x%x %p, SKID.hat_p: 0x%x %p\r\n",
               u3R->hat_p, u3a_into(u3R->hat_p),
               rod_u->hat_p, u3a_into(rod_u->hat_p));
@@ -854,7 +872,7 @@ u3m_leap(c3_w pad_w)
       bot_p = u3R->cap_p;
 
       rod_u = _pave_north(u3a_into(bot_p), c3_wiseof(u3a_road), len_w);
-#if 1
+#if 0
       fprintf(stderr, "SPAR.hat_p: 0x%x %p, NKID.hat_p: 0x%x %p\r\n",
               u3R->hat_p, u3a_into(u3R->hat_p),
               rod_u->hat_p, u3a_into(rod_u->hat_p));
@@ -880,8 +898,8 @@ u3m_leap(c3_w pad_w)
 #ifdef U3_MEMORY_DEBUG
   rod_u->all.fre_w = 0;
 #endif
-  if (BSIMSUM_DEBUG && ((~u3R->hat_p) & (u3R->hat_p + 1)) != 1)
-    __asm__ volatile("int $0x03");
+  /* if (BSIMSUM_DEBUG && ((~u3R->hat_p) & (u3R->hat_p + 1)) != 1) */
+  /*   __asm__ volatile("int $0x03"); */
 }
 
 void
@@ -924,6 +942,18 @@ u3m_fall()
   }
   u3a_print_memory(stderr, "low water mark", wat_w);
 
+#endif
+
+#if BSIMSUM_DEBUG && MEASURE_STACK
+  fprintf(stderr, "FALL, new depth: %zu, refpoint: %zu\r\n", --leap_depf, ++ref_point);
+  u3a_road* cur_u = u3R;
+  size_t    stak_w = 0;
+  for (u3a_road* cur_u = u3R
+         ; u3a_outa(cur_u)
+         ; cur_u = u3to(u3_road, cur_u->par_p))
+    stak_w += u3a_temp(cur_u);
+  fprintf(stderr, "\ttotal stack size: 0x%zuW, 0x%zuK, will lose: 0x%zXW, 0x%zXK\r\n",
+          stak_w, stak_w >> 8, (size_t)u3a_temp(u3R), (size_t)u3a_temp(u3R) >> 8);
 #endif
 
   u3to(u3_road, u3R->par_p)->pro.nox_d += u3R->pro.nox_d;
