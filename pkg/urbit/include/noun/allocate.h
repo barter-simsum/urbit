@@ -270,7 +270,9 @@ inline c3_w u3a_outa(void *p) {
     */
 /* #     define u3a_to_off(som)    ((som) & 0x3fffffff) */
 inline c3_w u3a_to_off(c3_w som) {
-  return som & 0x3fffffff;      /* 1 << 30 - 1 */
+  c3_w ret = som & 0x3fffffff;  /* mask off tag bits */
+  ret <<= 1;                    /* decompress */
+  return ret;
 }
 /* # define u3a_to_off(som) (u3a_to_off(som)) */
 
@@ -292,11 +294,27 @@ inline c3_w *u3a_to_wtr(c3_w som) {
 
     /* u3a_to_pug(): set bit 31 of [off].
     */
-#     define u3a_to_pug(off)    (off | 0x80000000)
+/* #     define u3a_to_pug(off)    (off | 0x80000000) */
+inline c3_w u3a_to_pug(c3_w off) {
+  if (BSIMSUM_DEBUG && (off & 0x1U) != 0)
+    __asm__ volatile("int $0x03");
+  c3_w ret = off;
+  ret >>= 1;                    /* compress */
+  ret |= 0x80000000;
+  return ret;
+}
 
     /* u3a_to_pom(): set bits 30 and 31 of [off].
     */
-#     define u3a_to_pom(off)    (off | 0xc0000000)
+/* #     define u3a_to_pom(off)    (off | 0xc0000000) */
+inline c3_w u3a_to_pom(c3_w off) {
+  if (BSIMSUM_DEBUG && (off & 0x1U) != 0)
+    __asm__ volatile("int $0x03");
+  c3_w ret = off;
+  ret >>= 1;                    /* compress */
+  ret |= 0xc0000000;
+  return ret;
+}
 
     /* u3a_is_atom(): yes if noun [som] is direct atom or indirect atom.
     */
