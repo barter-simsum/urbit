@@ -1745,7 +1745,7 @@ _cr_mug_next(u3a_pile* pil_u, u3_noun veb)
 /* u3r_mug(): statefully mug a noun with 31-bit murmur3.
 */
 c3_l
-u3r_mug(u3_noun veb)
+u3r_mug(u3_noun veb)            /* ;;: -- perhaps this is the issue. */
 {
   u3a_pile  pil_u;
   _cr_mugf* fam_u;

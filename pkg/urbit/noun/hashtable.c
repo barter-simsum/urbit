@@ -5,11 +5,11 @@
 
 /* CUT_END(): extract [b_w] low bits from [a_w]
 */
-#define CUT_END(a_w, b_w) (a_w & ((1 << b_w) - 1))
+#define CUT_END(a_w, b_w) ((a_w) & ((1 << (b_w)) - 1))
 
 /* BIT_SET(): [1] if bit [b_w] is set in [a_w]
 */
-#define BIT_SET(a_w, b_w) (a_w & (1 << b_w))
+#define BIT_SET(a_w, b_w) ((a_w) & (1 << (b_w)))
 
 static c3_o
 _ch_trim_slot(u3h_root* har_u, u3h_slot *sot_w, c3_w lef_w, c3_w rem_w);
@@ -233,7 +233,7 @@ _ch_slot_put(u3h_slot* sot_w, u3_noun kev, c3_w lef_w, c3_w rem_w, c3_w* use_w)
     }
     else {
       c3_w ham_w = CUT_END(u3r_mug(u3h(kov)), lef_w);
-      *sot_w     = _ch_two(*sot_w, add_w, lef_w, ham_w, rem_w);
+      *sot_w     = _ch_two(*sot_w, add_w, lef_w, ham_w, rem_w); /* ;;: here :/ */
       *use_w    += 1;
     }
   }
@@ -331,7 +331,7 @@ _ch_trim_node(u3h_root* har_u, u3h_slot* sot_w, c3_w lef_w, c3_w rem_w)
     else {
       // shrink node in place; don't reallocate, we could be low on memory
       //
-      han_u->map_w &= ~(1 << bit_w);
+      han_u->map_w &= ~(1 << bit_w); /* ;;: -- is this an issue? */
       --len_w;
 
       for ( i_w = inx_w; i_w < len_w; i_w++ ) {

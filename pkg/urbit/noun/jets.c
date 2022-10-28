@@ -801,8 +801,8 @@ u3j_boot(c3_o nuu_o)
 {
   c3_assert(u3R == &(u3H->rod_u));
 
-  u3D.len_l =_cj_count(0, u3D.dev_u);
-  u3D.all_l = (2 * u3D.len_l) + 1024;     //  horrid heuristic
+  u3D.len_l = _cj_count(0, u3D.dev_u);
+  u3D.all_l = (2 * u3D.len_l) + 1024;     //  horrid heuristic -- ;;: is this an issue? -- I don't think so
 
   u3D.ray_u = c3_malloc(u3D.all_l * sizeof(u3j_core));
   memset(u3D.ray_u, 0, (u3D.all_l * sizeof(u3j_core)));
