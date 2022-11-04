@@ -1993,29 +1993,29 @@ u3a_print_time(c3_c* str_c, c3_c* cap_c, c3_d mic_d)
 /* u3a_print_memory: print memory amount.
 */
 void
-u3a_print_memory(FILE* fil_u, c3_c* cap_c, c3_w wor_w)
+u3a_print_memory(FILE* fil_u, c3_c* cap_c, c3_d wor_w)
 {
   c3_assert( 0 != fil_u );
 
-  c3_w byt_w = (wor_w * 4);
-  c3_w gib_w = (byt_w / 1000000000);
-  c3_w mib_w = (byt_w % 1000000000) / 1000000;
-  c3_w kib_w = (byt_w % 1000000) / 1000;
-  c3_w bib_w = (byt_w % 1000);
+  size_t byt_w = (wor_w * 4);
+  size_t gib_w = (byt_w / 1000000000);
+  size_t mib_w = (byt_w % 1000000000) / 1000000;
+  size_t kib_w = (byt_w % 1000000) / 1000;
+  size_t bib_w = (byt_w % 1000);
 
   if ( byt_w ) {
     if ( gib_w ) {
-      fprintf(fil_u, "%s: GB/%d.%03d.%03d.%03d\r\n",
+      fprintf(fil_u, "%s: GB/%zu.%03zu.%03zu.%03zu\r\n",
               cap_c, gib_w, mib_w, kib_w, bib_w);
     }
     else if ( mib_w ) {
-      fprintf(fil_u, "%s: MB/%d.%03d.%03d\r\n", cap_c, mib_w, kib_w, bib_w);
+      fprintf(fil_u, "%s: MB/%zu.%03zu.%03zu\r\n", cap_c, mib_w, kib_w, bib_w);
     }
     else if ( kib_w ) {
-      fprintf(fil_u, "%s: KB/%d.%03d\r\n", cap_c, kib_w, bib_w);
+      fprintf(fil_u, "%s: KB/%zu.%03zu\r\n", cap_c, kib_w, bib_w);
     }
     else if ( bib_w ) {
-      fprintf(fil_u, "%s: B/%d\r\n", cap_c, bib_w);
+      fprintf(fil_u, "%s: B/%zu\r\n", cap_c, bib_w);
     }
   }
 }

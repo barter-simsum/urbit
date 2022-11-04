@@ -753,7 +753,7 @@ inline c3_w u3a_to_pom(c3_w off) {
         /* u3a_print_memory(): print memory amount.
         */
           void
-          u3a_print_memory(FILE* fil_u, c3_c* cap_c, c3_w wor_w);
+          u3a_print_memory(FILE* fil_u, c3_c* cap_c, c3_d wor_w);
 
         /* u3a_prof(): mark/measure/print memory profile. RETAIN.
         */
