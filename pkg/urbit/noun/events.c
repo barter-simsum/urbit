@@ -83,6 +83,7 @@ static u3p(c3_w) gar_pag_p;
 static const size_t pag_wiz_i = 1 << u3a_page;
 
 //! Urbit page size in bytes.
+/* ;;: there might be dangerous usages of this. Confirm usages don't assign to c3_w */
 static const size_t pag_siz_i = sizeof(c3_w) * pag_wiz_i;
 
 #ifdef U3_SNAPSHOT_VALIDATION
@@ -353,7 +354,7 @@ _ce_image_open(u3e_image* img_u)
 static void
 _ce_patch_write_control(u3_ce_patch* pat_u)
 {
-  c3_w len_w = sizeof(u3e_control) +
+  c3_d len_w = sizeof(u3e_control) +
                (pat_u->con_u->pgs_w * sizeof(u3e_line));
 
   if ( len_w != write(pat_u->ctl_i, pat_u->con_u, len_w) ) {
@@ -366,7 +367,7 @@ _ce_patch_write_control(u3_ce_patch* pat_u)
 static c3_o
 _ce_patch_read_control(u3_ce_patch* pat_u)
 {
-  c3_w len_w;
+  c3_d len_w;
 
   c3_assert(0 == pat_u->con_u);
   {
@@ -376,7 +377,7 @@ _ce_patch_read_control(u3_ce_patch* pat_u)
       c3_assert(0);
       return c3n;
     }
-    len_w = (c3_w) buf_u.st_size;
+    len_w = buf_u.st_size;
   }
 
   pat_u->con_u = c3_malloc(len_w);
@@ -696,7 +697,7 @@ static void
 _ce_image_resize(u3e_image* img_u, c3_w pgs_w)
 {
   if ( img_u->pgs_w > pgs_w ) {
-    if ( ftruncate(img_u->fid_i, pgs_w << (u3a_page + 2)) ) {
+    if ( ftruncate(img_u->fid_i, (c3_d)pgs_w << (u3a_page + 2)) ) { /* ;;: very bad overflow likely */
       fprintf(stderr, "loom: image (%s) truncate: %s\r\n",
                       img_u->nam_c,
                       strerror(errno));
@@ -712,14 +713,14 @@ _ce_image_resize(u3e_image* img_u, c3_w pgs_w)
 static void
 _ce_patch_apply(u3_ce_patch* pat_u)
 {
-  c3_w i_w;
+  c3_d i_w;
 
   //  resize images
   //
   _ce_image_resize(&u3P.nor_u, pat_u->con_u->nor_w);
   _ce_image_resize(&u3P.sou_u, pat_u->con_u->sou_w);
 
-  //  seek to begining of patch and images
+  //  seek to beginning of patch and images
   //
   if (  (-1 == lseek(pat_u->mem_i, 0, SEEK_SET))
      || (-1 == lseek(u3P.nor_u.fid_i, 0, SEEK_SET))
@@ -735,7 +736,7 @@ _ce_patch_apply(u3_ce_patch* pat_u)
     c3_w pag_w = pat_u->con_u->mem_u[i_w].pag_w;
     c3_w mem_w[pag_wiz_i];
     c3_i fid_i;
-    c3_w off_w;
+    c3_d off_w;
 
     if ( pag_w < pat_u->con_u->nor_w ) {
       fid_i = u3P.nor_u.fid_i;
@@ -751,7 +752,7 @@ _ce_patch_apply(u3_ce_patch* pat_u)
       c3_assert(0);
     }
     else {
-      if ( -1 == lseek(fid_i, (off_w << (u3a_page + 2)), SEEK_SET) ) {
+      if ( -1 == lseek(fid_i, (off_w << (u3a_page + 2)), SEEK_SET) ) { /* ;;: bad. overflow possible */
         fprintf(stderr, "loom: patch apply seek: %s\r\n", strerror(errno));
         c3_assert(0);
       }
@@ -760,7 +761,7 @@ _ce_patch_apply(u3_ce_patch* pat_u)
         c3_assert(0);
       }
     }
-#if 0
+#if 1
     u3l_log("apply: %d, %x\n", pag_w, u3r_mug_words(mem_w, pag_wiz_i));
 #endif
   }
@@ -781,7 +782,7 @@ _ce_image_blit(u3e_image* img_u,
   c3_w siz_w = pag_siz_i;
 
   lseek(img_u->fid_i, 0, SEEK_SET);
-  for ( i_w = 0; i_w < img_u->pgs_w; i_w++ ) {
+  for ( i_w = 0; i_w < img_u->pgs_w; i_w++ ) { /* ;;: fine */
     if ( -1 == read(img_u->fid_i, ptr_w, siz_w) ) {
       fprintf(stderr, "loom: image (%s) blit read: %s\r\n",
                       img_u->nam_c, strerror(errno));
@@ -810,11 +811,11 @@ _ce_image_fine(u3e_image* img_u,
                c3_w*        ptr_w,
                c3_ws        stp_ws)
 {
-  c3_w i_w;
+  c3_d i_w;                     /* fine, but why not? */
   c3_w buf_w[pag_wiz_i];
 
   lseek(img_u->fid_i, 0, SEEK_SET);
-  for ( i_w=0; i_w < img_u->pgs_w; i_w++ ) {
+  for ( i_w=0; i_w < img_u->pgs_w; i_w++ ) { /* ;;: fine */
     c3_w mem_w, fil_w;
 
     if ( -1 == read(img_u->fid_i, buf_w, pag_siz_i) ) {
@@ -869,7 +870,7 @@ _ce_image_copy(u3e_image* fom_u, u3e_image* tou_u)
   //
   for ( i_w = 0; i_w < fom_u->pgs_w; i_w++ ) {
     c3_w mem_w[pag_wiz_i];
-    c3_w off_w = i_w;
+    c3_d off_w = i_w;
 
     if ( -1 == read(fom_u->fid_i, mem_w, pag_siz_i) ) {
       fprintf(stderr, "loom: image (%s) copy read: %s\r\n",
@@ -878,7 +879,7 @@ _ce_image_copy(u3e_image* fom_u, u3e_image* tou_u)
       return c3n;
     }
     else {
-      if ( -1 == lseek(tou_u->fid_i, (off_w << (u3a_page + 2)), SEEK_SET) ) {
+      if ( -1 == lseek(tou_u->fid_i, ((c3_d)off_w << (u3a_page + 2)), SEEK_SET) ) { /* ;;: bad. overflow */
         fprintf(stderr, "loom: image (%s) copy seek: %s\r\n",
                         tou_u->nam_c,
                         strerror(errno));
@@ -1017,7 +1018,7 @@ u3e_live(c3_o nuu_o, c3_c* dir_c)
 {
   //  require that our page size is a multiple of the system page size.
   //
-  c3_assert(0 == (1 << (2 + u3a_page)) % sysconf(_SC_PAGESIZE));
+  c3_assert(0 == ((c3_d)1 << (2 + u3a_page)) % sysconf(_SC_PAGESIZE));
 
   u3P.dir_c = dir_c;
   u3P.nor_u.nam_c = "north";
@@ -1084,7 +1085,7 @@ u3e_live(c3_o nuu_o, c3_c* dir_c)
       }
       else {
         u3a_print_memory(stderr, "live: loaded",
-                         (u3P.nor_u.pgs_w + u3P.sou_u.pgs_w) << u3a_page);
+                         (c3_d)(u3P.nor_u.pgs_w + u3P.sou_u.pgs_w) << u3a_page);
       }
     }
   }

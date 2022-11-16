@@ -1,3 +1,5 @@
+#define VERBOSE_DISK 1
+
 #   include "config.h"
   /** c3: C environment.
   **/

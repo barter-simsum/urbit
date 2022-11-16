@@ -16,7 +16,7 @@
         c3_w     ver_y;                     //  version number
         c3_w     nor_w;                     //  new page count north
         c3_w     sou_w;                     //  new page count south
-        c3_w     pgs_w;                     //  number of changed pages
+        c3_d     pgs_w;                     //  number of changed pages  ;;: we could change this to a c3_d to be extra sure we're not overflowing when assigning temporary variables to f(pgs_w)
         u3e_line mem_u[0];                  //  per page
       } u3e_control;
 
