@@ -2,6 +2,7 @@
 #define U3_ALLOCATE_H
 
 #include "manage.h"
+#include "options.h"
 
   /**  Constants.
   **/
@@ -9,17 +10,10 @@
     */
 #     define u3a_bits    U3_OS_LoomBits /* 30 */
 
-    /* u3a_vits: number of virtual bits in a noun reference gained via shifting
+    /* u3a_vits: number of virtual bits in a reference gained via pointer
+       compression
     */
-#     define u3a_vits    1
-
-    /* u3a_walign: references into the loom are guaranteed to be word-aligned to:
-    */
-#     define u3a_walign  (1 << u3a_vits)
-
-    /* u3a_balign: u3a_walign in bytes
-    */
-#     define u3a_balign  (sizeof(c3_w)*u3a_walign)
+#     define u3a_vits_max 1
 
     /* u3a_page: number of bits in word-addressed page.  12 == 16K page
     */
@@ -27,11 +21,11 @@
 
     /* u3a_pages: maximum number of pages in memory.
     */
-#     define u3a_pages   (1ULL << (u3a_bits + u3a_vits - u3a_page) )
+#     define u3a_pages   (1ULL << (u3a_bits + /* u3a_vits */ u3a_vits_max - u3a_page) )
 
     /* u3a_words: maximum number of words in memory.
     */
-#     define u3a_words   ( 1ULL << (u3a_bits + u3a_vits))
+#     define u3a_words   ( 1ULL << (u3a_bits + /* u3a_vits */ u3a_vits_max ))
 
     /* u3a_bytes: maximum number of bytes in memory.
     */
@@ -220,6 +214,24 @@
 
 #   define u3_Loom      ((c3_w *)(void *)U3_OS_LoomBase)
 
+/* u3a_config_loom(): configure loom information by u3v version
+ */
+inline void u3a_config_loom(c3_w ver_w) {
+  switch (ver_w) {
+  case /* U3V_VER1 */ 1:
+    u3C.vits_w = 0;
+    break;
+  case /* U3V_VER2 */ 2:
+    u3C.vits_w = 1;
+    break;
+  default:
+    c3_assert(0);
+  }
+
+  u3C.walign_w = 1 << u3C.vits_w;
+  u3C.balign_d = sizeof(c3_w) * u3C.walign_w;
+}
+
 /* c3_align: hi or lo align x to al
 
    unless effective type of x is c3_w or c3_d, assumes x is a pointer.
@@ -230,18 +242,20 @@
            c3_d     : c3_align_d,               \
            default  : c3_align_p)               \
        (x, al, hilo)
+/* ;;: these are wrong. The commented out - 1 is correct, but it causes a
+     crash. Why? -- FIGURE OUT WHY*/
 typedef enum { ALHI=1, ALLO=0 } align_dir;
 inline c3_w
 c3_align_w(c3_w x, c3_w al, align_dir hilo) {
   c3_dessert(hilo <= ALHI && hilo >= ALLO);
-  x += hilo * al;
+  x += hilo * (al /* - 1 */);
   x &= ~(al - 1);
   return x;
 }
 inline c3_d
 c3_align_d(c3_d x, c3_d al, align_dir hilo) {
   c3_dessert(hilo <= ALHI && hilo >= ALLO);
-  x += hilo * al;
+  x += hilo * (al /* - 1 */);
   x &= ~(al - 1);
   return x;
 }
@@ -249,7 +263,7 @@ inline void*
 c3_align_p(void const * p, size_t al, align_dir hilo) {
   uintptr_t x = (uintptr_t)p;
   c3_dessert(hilo <= ALHI && hilo >= ALLO);
-  x += hilo * al;
+  x += hilo * (al /* - 1 */);
   x &= ~(al - 1);
   return (void*)x;
 }
@@ -305,7 +319,7 @@ inline c3_w u3a_outa(void *p) {
     */
 inline c3_w u3a_to_off(c3_w som) {
   c3_w ret = som & 0x3fffffff;  /* mask off tag bits */
-  ret <<= u3a_vits;             /* decompress */
+  ret <<= u3C.vits_w;           /* decompress */
   return ret;
 }
 
@@ -324,9 +338,9 @@ inline c3_w *u3a_to_wtr(c3_w som) {
     /* u3a_to_pug(): set bit 31 of [off].
     */
 inline c3_w u3a_to_pug(c3_w off) {
-  c3_dessert((off & u3a_walign-1) == 0);
+  c3_dessert((off & u3C.walign_w-1) == 0);
   c3_w ret = off;
-  ret >>= u3a_vits;             /* compress */
+  ret >>= u3C.vits_w;             /* compress */
   ret |= 0x80000000;
   return ret;
 }
@@ -334,9 +348,9 @@ inline c3_w u3a_to_pug(c3_w off) {
     /* u3a_to_pom(): set bits 30 and 31 of [off].
     */
 inline c3_w u3a_to_pom(c3_w off) {
-  c3_dessert((off & u3a_walign-1) == 0);
+  c3_dessert((off & u3C.walign_w-1) == 0);
   c3_w ret = off;
-  ret >>= u3a_vits;             /* compress */
+  ret >>= u3C.vits_w;             /* compress */
   ret |= 0xc0000000;
   return ret;
 }
@@ -363,9 +377,11 @@ inline c3_w u3a_to_pom(c3_w off) {
            ? ( ((u3a_cell *)u3a_to_ptr(som))->tel )\
            : u3m_bail(c3__exit) )
 
+/* ;;: TODO fix the lack of arg-wrapping parens here */
+
     /* u3a_is_north(): yes if road [r] is north road.
     */
-#     define  u3a_is_north(r)  __(r->cap_p > r->hat_p)
+#     define  u3a_is_north(r)  __((r)->cap_p > (r)->hat_p)
 
     /* u3a_is_south(): yes if road [r] is south road.
     */
@@ -374,47 +390,47 @@ inline c3_w u3a_to_pom(c3_w off) {
     /* u3a_open(): words of contiguous free space in road [r]
     */
 #     define  u3a_open(r)  ( (c3y == u3a_is_north(r)) \
-                             ? (c3_w)(r->cap_p - r->hat_p) \
-                             : (c3_w)(r->hat_p - r->cap_p) )
+                             ? (c3_w)((r)->cap_p - (r)->hat_p) \
+                             : (c3_w)((r)->hat_p - (r)->cap_p) )
 
     /* u3a_full(): total words in road [r];
     ** u3a_full(r) == u3a_heap(r) + u3a_temp(r) + u3a_open(r)
     */
 #     define  u3a_full(r)  ( (c3y == u3a_is_north(r)) \
-                             ? (c3_w)(r->mat_p - r->rut_p) \
-                             : (c3_w)(r->rut_p - r->mat_p) )
+                             ? (c3_w)((r)->mat_p - (r)->rut_p) \
+                             : (c3_w)((r)->rut_p - (r)->mat_p) )
 
     /* u3a_heap(): words of heap in road [r]
     */
 #     define  u3a_heap(r)  ( (c3y == u3a_is_north(r)) \
-                             ? (c3_w)(r->hat_p - r->rut_p) \
-                             : (c3_w)(r->rut_p - r->hat_p) )
+                             ? (c3_w)((r)->hat_p - (r)->rut_p) \
+                             : (c3_w)((r)->rut_p - (r)->hat_p) )
 
     /* u3a_temp(): words of stack in road [r]
     */
 #     define  u3a_temp(r)  ( (c3y == u3a_is_north(r)) \
-                             ? (c3_w)(r->mat_p - r->cap_p) \
-                             : (c3_w)(r->cap_p - r->mat_p) )
+                             ? (c3_w)((r)->mat_p - (r)->cap_p) \
+                             : (c3_w)((r)->cap_p - (r)->mat_p) )
 
 #     define  u3a_north_is_senior(r, dog) \
-                __((u3a_to_off(dog) < r->rut_p) ||  \
-                       (u3a_to_off(dog) >= r->mat_p))
+                __((u3a_to_off(dog) < (r)->rut_p) ||  \
+                       (u3a_to_off(dog) >= (r)->mat_p))
 
 #     define  u3a_north_is_junior(r, dog) \
-                __((u3a_to_off(dog) >= r->cap_p) && \
-                       (u3a_to_off(dog) < r->mat_p))
+                __((u3a_to_off(dog) >= (r)->cap_p) && \
+                       (u3a_to_off(dog) < (r)->mat_p))
 
 #     define  u3a_north_is_normal(r, dog) \
                 c3a(!(u3a_north_is_senior(r, dog)),  \
                        !(u3a_north_is_junior(r, dog)))
 
 #     define  u3a_south_is_senior(r, dog) \
-                __((u3a_to_off(dog) < r->mat_p) || \
-                       (u3a_to_off(dog) >= r->rut_p))
+                __((u3a_to_off(dog) < (r)->mat_p) || \
+                       (u3a_to_off(dog) >= (r)->rut_p))
 
 #     define  u3a_south_is_junior(r, dog) \
-                __((u3a_to_off(dog) < r->cap_p) && \
-                       (u3a_to_off(dog) >= r->mat_p))
+                __((u3a_to_off(dog) < (r)->cap_p) && \
+                       (u3a_to_off(dog) >= (r)->mat_p))
 
 #     define  u3a_south_is_normal(r, dog) \
                 c3a(!(u3a_south_is_senior(r, dog)),  \
@@ -463,9 +479,9 @@ inline c3_w u3a_to_pom(c3_w off) {
 #define _rod_vaal(rod_u)                                                \
   do {                                                                  \
     c3_dessert(((uintptr_t)((u3a_road*)(rod_u))->hat_p                  \
-                & u3a_walign-1) == 0);                                  \
+                & u3C.walign_w-1) == 0);                                \
     c3_dessert(((uintptr_t)((u3a_road*)(rod_u))->cap_p                  \
-                & u3a_walign-1) == 0);                                  \
+                & u3C.walign_w-1) == 0);                                \
   } while(0)
 
 
