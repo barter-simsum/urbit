@@ -26,6 +26,7 @@
 #   include "noun/urth.h"      //  u3u: off-loom integration
 #   include "noun/vortex.h"    //  u3v: arvo kernel
 #   include "noun/zave.h"      //  u3z: memoization
+#   include "noun/version2.h"  // ;;: write something here
 
 #   include "jets/k.h"         //  u3k: jets (transfer, args)
 #   include "jets/q.h"         //  u3q: jets (retain, args)

@@ -1,6 +1,8 @@
 #ifndef U3_MANAGE_H
 #define U3_MANAGE_H
 
+#include "version2.h"
+
     /** System management.
     **/
       /* u3m_boot(): start the u3 system. return next event, starting from 1.
@@ -158,6 +160,6 @@
          ver_w - target version
       */
         void
-        u3m_migrate(c3_w ver_w);
+        u3m_migrate(u3v_version ver_w);
 
 #endif /* ifndef U3_MANAGE_H */
